@@ -62,6 +62,12 @@ npm run ext:lint                  Mozilla's validator, run before signing
 site may open `cdreplay` links. Add `&web` to a replay link to get the web client instead. Run the exe once from its
 final location so the registered path is right.
 
+## CI
+
+`.gitlab-ci.yml`: syntax and extension lint on every push, Windows portable build plus a GitLab release on tags, and a
+manual Firefox signing job (`WEB_EXT_API_KEY` / `WEB_EXT_API_SECRET` as masked CI variables). `ci/gitlab-runner/` has a
+compose file for a docker-executor runner; register it once with a runner token from the project's CI/CD settings.
+
 ## Layout
 
 `main.js` Electron main process. `serve.js` http server: client file cache and patches, map/mod CDN proxy, ladder API

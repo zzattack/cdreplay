@@ -1,0 +1,18 @@
+# GitLab runner with the docker executor, for the docker LXC.
+#   docker compose up -d
+#   docker compose exec gitlab-runner gitlab-runner register --non-interactive --url https://git.zzattack.org \
+#       --token <project or shared runner token> --executor docker --docker-image node:20 \
+#       --docker-volumes /var/run/docker.sock:/var/run/docker.sock --docker-volumes gitlab-runner-cache:/cache
+# then raise `concurrent` in ./config/config.toml if the host can take more than one job at a time.
+services:
+  gitlab-runner:
+    image: gitlab/gitlab-runner:latest
+    container_name: gitlab-runner
+    restart: unless-stopped
+    volumes:
+      - ./config:/etc/gitlab-runner
+      - /var/run/docker.sock:/var/run/docker.sock
+      - gitlab-runner-cache:/cache
+
+volumes:
+  gitlab-runner-cache:

@@ -1,0 +1,56 @@
+stages: [check, build, sign]
+
+default:
+  image: node:20
+  cache:
+    key:
+      files: [package-lock.json]
+    paths: [node_modules/, .cache/]
+
+variables:
+  ELECTRON_CACHE: $CI_PROJECT_DIR/.cache/electron
+  ELECTRON_BUILDER_CACHE: $CI_PROJECT_DIR/.cache/electron-builder
+  npm_config_cache: $CI_PROJECT_DIR/.cache/npm
+
+check:
+  stage: check
+  script:
+    - npm ci
+    - node --check main.js serve.js cdreplay.js
+    - node -e "const h=require('fs').readFileSync('browser.html','utf8');new Function(h.match(/<script>([\s\S]*)<\/script>/)[1])"
+    - npx web-ext lint --source-dir chrome-extension
+
+# portable exe and zip for Windows, cross-built on Linux (no code signing or icon editing, so no wine needed)
+build-win:
+  stage: build
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - npm ci
+    - npx electron-builder --win
+  artifacts:
+    name: cdreplay-$CI_COMMIT_TAG
+    paths: [dist/cdreplay.exe, dist/*.zip]
+    expire_in: 1 year
+
+release:
+  stage: build
+  needs: [build-win]
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  rules:
+    - if: $CI_COMMIT_TAG
+  script: [echo "release $CI_COMMIT_TAG"]
+  release:
+    tag_name: $CI_COMMIT_TAG
+    description: "cdreplay $CI_COMMIT_TAG. Portable exe and zip are the build-win job artifacts."
+
+# Firefox signature through addons.mozilla.org; WEB_EXT_API_KEY and WEB_EXT_API_SECRET are masked CI variables
+sign-ext:
+  stage: sign
+  when: manual
+  script:
+    - npm ci
+    - npx web-ext sign --source-dir chrome-extension --artifacts-dir dist-ext --channel unlisted
+  artifacts:
+    paths: [dist-ext/*.xpi]
+    expire_in: 1 year
