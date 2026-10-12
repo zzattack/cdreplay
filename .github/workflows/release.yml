@@ -22,3 +22,7 @@ jobs:
         with:
           files: dist/cdreplay.exe
           generate_release_notes: true
+          body: |
+            **cdreplay.exe**: the viewer, portable (no installer). Needs your Red Alert 2 game files once.
+            **cdreplay-firefox-*.xpi** (when attached): Firefox add-on that opens Chrono Divide replay links in the app
+            instead of the web client. Chrome users load the `chrome-extension` folder unpacked instead.

@@ -1,32 +1,48 @@
 # cdreplay
 
-A standalone replay viewer for [Chrono Divide](https://chronodivide.com), the browser remake of Red Alert 2. It is the
-real game client in an Electron window with a seek bar and observer overlays added:
+A standalone replay viewer for **[Chrono Divide](https://chronodivide.com)**, the browser remake of Red Alert 2.
+Everything here is built on top of the Chrono Divide client: cdreplay runs the real game client in an Electron window
+and adds a seek bar and observer overlays on top of it. All rendering and simulation is Chrono Divide's own.
 
-- **Seeking** both ways on a media-player style bar. Backward seeks use keyframes: extra game instances are built
-  with the client's own loader, advanced in idle time and parked, so a jump costs about a second plus the remaining
-  simulation at 5,000 to 8,000 ticks per second.
-- **Overlays**: match header (players, flags, MMR, power, credits, map, region, date), unit counters with cameos over
-  the sidebar, production queues with cameos, health bars for every unit and the owner's current selection, the
-  client's target lines for all units, APM per player. Team games are grouped by alliance.
-- **End screen** with the result, MMR changes, units built/lost/killed and animated graphs of credits earned, army
-  value and APM.
-- **Game browser**: ladder standings, recent games (per ladder), a player's games with filters, drag-and-drop of local
-  `.rpl` files. Replays switch in about a second without reloading the engine.
+![Replay with overlays](docs/replay.png)
 
-cdreplay is not affiliated with Chrono Divide. It downloads the official client from game.chronodivide.com on first run
-and patches it in memory; nothing of Chrono Divide or Red Alert 2 is included in this repository or in the builds.
+## Features
+
+- **Seek bar**: jump anywhere in a replay, forwards and backwards, media-player style. Backward seeks use keyframes
+  (extra game instances parked at intervals), so a jump takes about a second.
+- **Unit counters**: per player, in the sidebar, with the game's own cameos: miners, war factories, tanks, dogs, and
+  whatever else is on the field, plus credits and total spent.
+- **Production queues**: what each player is building in every queue, with cameos and progress.
+- **Target lines**: the game's target lines for every unit of every player, flashing on new orders.
+- **APM tracker**: actions per minute per player, live and as a graph on the end screen.
+- Also: a match header (MMR, power, credits, map, region, date), health bars for all units, the owner's current
+  selection, an end screen with units built/lost/killed and graphs of credits earned, army value and APM, team games
+  grouped by alliance.
+- **Game browser**: ladder standings, recent games per ladder, a player's games with filters (map, length, opponent
+  MMR, factions, result), drag-and-drop of local `.rpl` files. Switching replays takes about a second.
+
+![Game browser](docs/browser.png)
 
 ## Install
 
-1. Download `cdreplay.exe` from the latest release (portable, no installer; unsigned, so SmartScreen warns once).
-2. Run it. The client asks for the Red Alert 2 game files once: choose "browse folder" and pick your RA2 install
-   (the one you imported into the web client works too). Everything is kept in `%LOCALAPPDATA%\cdreplay`.
-3. Optional, to open replay links from the ladder site directly in the app: the browser extension in
-   `chrome-extension/`. Chrome: `chrome://extensions`, developer mode, "Load unpacked", pick the folder. Firefox: install
-   the signed `.xpi` from the release. Add `&web` to a replay link to get the web client instead.
+1. Download `cdreplay.exe` from the [latest release](../../releases/latest). It is portable: no installer, and
+   unsigned, so SmartScreen warns once.
+2. Run it. The client asks for the Red Alert 2 game files once; choose "browse folder" and pick your RA2 install.
+   Everything is kept in `%LOCALAPPDATA%\cdreplay`.
+3. Optional: open replay links from the ladder site directly in the app with the browser extension. Chrome:
+   `chrome://extensions`, developer mode, "Load unpacked", pick the `chrome-extension` folder of this repository.
+   Firefox: install the signed `.xpi` from the release. Append `&web` to a replay link to get the web client instead.
 
 Keys in a replay: space pause, comma/period seek 10 s, `<` `>` seek 1 min, F12 developer tools (`window.cdr`).
+
+## Credits
+
+- [Chrono Divide](https://chronodivide.com) by its author, which this tool is entirely built on. cdreplay is not
+  affiliated with Chrono Divide; it downloads the official client on first run and patches it in memory. Nothing of
+  Chrono Divide or Red Alert 2 is included in this repository or in the builds.
+- The unit counters and stream overlays remake elements of the overlays used on the Twitch channel
+  [RA2CastTV](https://www.twitch.tv/ra2casttv) and by livestreamer doof88.
+- Programmed by Claude (Anthropic), directed by Frank Razenberg.
 
 ## From source
 
