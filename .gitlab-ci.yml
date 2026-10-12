@@ -43,7 +43,12 @@ release:
   script: [echo "release $CI_COMMIT_TAG"]
   release:
     tag_name: $CI_COMMIT_TAG
-    description: "cdreplay $CI_COMMIT_TAG. The portable exe is the build-win job artifact."
+    description: "cdreplay $CI_COMMIT_TAG, portable Windows build."
+    assets:
+      links:
+        - name: cdreplay.exe
+          url: $CI_PROJECT_URL/-/jobs/artifacts/$CI_COMMIT_TAG/raw/dist/cdreplay.exe?job=build-win
+          link_type: package
 
 # Firefox signature through addons.mozilla.org; WEB_EXT_API_KEY and WEB_EXT_API_SECRET are masked CI variables
 sign-ext:
