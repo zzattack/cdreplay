@@ -12,7 +12,7 @@ and adds a seek bar and observer overlays on top of it. All rendering and simula
   (extra game instances parked at intervals), so a jump takes about a second.
 - **Unit counters**: per player, in the sidebar, with the game's own cameos: miners, war factories, tanks, dogs, and
   whatever else is on the field, plus credits and total spent. Heavily influenced by the stream overlay of
-  livestreamer doof88.
+  [doof88](https://www.twitch.tv/doof88).
 - **Production queues**: what each player is building in every queue, with cameos and progress. Also after doof88's
   overlay.
 - **Target lines**: the game's target lines for every unit of every player, flashing on new orders.
@@ -46,7 +46,7 @@ Keys in a replay: space pause, comma/period seek 10 s, `<` `>` seek 1 min, F12 d
   affiliated with Chrono Divide; it downloads the official client on first run and patches it in memory. Nothing of
   Chrono Divide or Red Alert 2 is included in this repository or in the builds.
 - The match header is mimicked from the Twitch channel [RA2CastTV](https://www.twitch.tv/ra2casttv); the unit
-  counters and production queues are heavily influenced by livestreamer doof88's stream overlay.
+  counters and production queues are heavily influenced by [doof88](https://www.twitch.tv/doof88)'s stream overlay.
 - Programmed by Claude (Anthropic), directed by Frank Razenberg.
 
 ## From source
