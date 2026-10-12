@@ -1,0 +1,24 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+jobs:
+  windows:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: node --check main.js serve.js cdreplay.js
+      - run: npx web-ext lint --source-dir chrome-extension
+      # portable exe, cross-built on Linux (no code signing or icon editing, so no wine needed)
+      - run: npx electron-builder --win portable
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/cdreplay.exe
+          generate_release_notes: true

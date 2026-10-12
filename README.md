@@ -1,78 +1,65 @@
 # cdreplay
 
-Standalone Chrono Divide replay viewer with seeking. It is the real game client, served from a local cache of
-game.chronodivide.com with `cdreplay.js` injected, inside an Electron window.
+A standalone replay viewer for [Chrono Divide](https://chronodivide.com), the browser remake of Red Alert 2. It is the
+real game client in an Electron window with a seek bar and observer overlays added:
+
+- **Seeking** both ways on a media-player style bar. Backward seeks use keyframes: extra game instances are built
+  with the client's own loader, advanced in idle time and parked, so a jump costs about a second plus the remaining
+  simulation at 5,000 to 8,000 ticks per second.
+- **Overlays**: match header (players, flags, MMR, power, credits, map, region, date), unit counters with cameos over
+  the sidebar, production queues with cameos, health bars for every unit and the owner's current selection, the
+  client's target lines for all units, APM per player. Team games are grouped by alliance.
+- **End screen** with the result, MMR changes, units built/lost/killed and animated graphs of credits earned, army
+  value and APM.
+- **Game browser**: ladder standings, recent games (per ladder), a player's games with filters, drag-and-drop of local
+  `.rpl` files. Replays switch in about a second without reloading the engine.
+
+cdreplay is not affiliated with Chrono Divide. It downloads the official client from game.chronodivide.com on first run
+and patches it in memory; nothing of Chrono Divide or Red Alert 2 is included in this repository or in the builds.
+
+## Install
+
+1. Download `cdreplay.exe` from the latest release (portable, no installer; unsigned, so SmartScreen warns once).
+2. Run it. The client asks for the Red Alert 2 game files once: choose "browse folder" and pick your RA2 install
+   (the one you imported into the web client works too). Everything is kept in `%LOCALAPPDATA%\cdreplay`.
+3. Optional, to open replay links from the ladder site directly in the app: the browser extension in
+   `chrome-extension/`. Chrome: `chrome://extensions`, developer mode, "Load unpacked", pick the folder. Firefox: install
+   the signed `.xpi` from the release. Add `&web` to a replay link to get the web client instead.
+
+Keys in a replay: space pause, comma/period seek 10 s, `<` `>` seek 1 min, F12 developer tools (`window.cdr`).
+
+## From source
 
 ```
-cdreplay.bat [file.rpl | ladder replay url | game id]     double-click: game browser; with an argument: that replay
-npm start -- <same>                                        the same through npm
-npm run serve                                              plain http server on :8787 for use in a normal browser
+npm install
+npm start -- [file.rpl | ladder replay url | game id]     game browser, or that replay
+npm run dist                                              dist\cdreplay.exe
+npm run ext:lint / npm run ext:sign                       Mozilla validator / sign the Firefox add-on (credentials in
+                                                          web-ext-config.cjs, see web-ext docs)
 ```
 
-First run: the client asks for the game files; choose "browse folder" and pick `C:\Westwood\RA2`. They are stored in
-the app's own storage under `cache/electron`.
+`cdreplay.bat` launches it from a working copy, with the same optional argument. `npm run dist:offline` adds a
+snapshot of the cached client to the exe for a machine without network access; do not distribute that build, the
+client is proprietary.
 
-## What the injected script adds
+## How it works
 
-- Seek bar inside the client's bottom action bar (keyboard: comma/period 10 s, angle brackets 1 min).
-- Forward seeks step the engine as fast as it goes (5-8k ticks/s). Backward seeks use keyframes: up to six extra
-  Game instances built with the client's own loader, advanced in idle time to evenly spaced ticks and parked. A seek
-  takes the cheapest source (live game, parked game plus a screen rebuild of ~1 s, or a restart), then fast-forwards.
-  The engine cannot snapshot (task callbacks are closures over live objects), which is why copies are simulated.
-- Overlays: match header top centre (players, flags, MMR, power, credits, map, region, date), unit counters with
-  cameos over the sidebar slots (credits and spent above), power, APM and production queues with cameos in the bottom
-  corners, the client's own target lines for every unit (toggle on the bar). Teams from the lobby alliances group
-  everything (2x2 for four players). Hidden while the game menu is open. Stop button top right returns to the browser.
-- End screen when the game ends: winner or winning team, MMR changes, units built/lost/killed, and animated graphs of
-  credits earned, army value and APM. Ladder data comes from the browser or is looked up by player name.
-- Game browser (`browser.html`): ladder standings per ladder, recent games, games per player, drag-and-drop of local
-  .rpl files. Lives as an overlay inside the client page so switching replays takes about a second.
-- Client patches: no pointer lock and no edge scrolling (the OS cursor works on the overlay), viewport always fills
-  the window, the 5 s splash minimum is stripped, detect-gpu's unknown-card fallback is raised so new GPUs are not
-  reported as unsupported.
+`serve.js` is a small http server: it mirrors the client files from game.chronodivide.com into the cache (per version),
+injects `cdreplay.js` into `index.html`, proxies maps, mods and the ladder API under the same origin, and serves replay
+files. `cdreplay.js` hooks the client's modules by their SystemJS names (`gui/screen/replay/ReplayScreen`,
+`network/gamestate/ReplayTurnManager`, `game/Game`, ...) and patches prototypes. `main.js` is the Electron shell,
+`browser.html` the game browser.
 
-## Packaging
+The engine cannot snapshot its state (task callbacks are closures over live objects), which is why keyframes are
+simulated copies rather than saved states. Client patches: no pointer lock and no edge scrolling (the OS cursor works on
+the overlays), the viewport always fills the window, the splash delay is skipped, and detect-gpu's fallback for cards
+newer than its list no longer reports "unsupported".
 
-```
-npm run dist          electron-builder: dist\cdreplay.exe (portable, single file) and dist\cdreplay-<version>-win.zip
-```
-
-```
-npm run dist:offline  dist-offline\cdreplay-offline.exe: the same plus a snapshot of the cached client and maps, for a
-                      machine without network access (still needs the RA2 game files). Private use only: the client is
-                      proprietary.
-```
-
-The packaged app keeps its caches in `%LOCALAPPDATA%\cdreplay` (client files, replays, imported game files, flags).
-The standard build contains only this project's files plus Electron; the client is mirrored from game.chronodivide.com
-on first run. Unsigned, so SmartScreen warns once.
-
-## Replay links from Chrome
-
-The exe registers the `cdreplay://` url scheme. `chrome-extension/` is a two-file extension that sends
-`game.chronodivide.com/#/replay/...` links to the app: in Chrome open `chrome://extensions`, enable developer mode,
-"Load unpacked", pick that folder. Firefox: `about:debugging#/runtime/this-firefox`, "Load Temporary Add-on", pick
-`manifest.json` (temporary add-ons are dropped when Firefox restarts). Permanent install needs Mozilla's signature:
-API credentials from https://addons.mozilla.org/developers/addon/api/key/ live in `web-ext-config.cjs` (not committed), then
-
-```
-npm run ext:sign                  signed .xpi lands in dist-ext\; open it in Firefox to install
-npm run ext:lint                  Mozilla's validator, run before signing
-``` Firefox asks once whether the
-site may open `cdreplay` links. Add `&web` to a replay link to get the web client instead. Run the exe once from its
-final location so the registered path is right.
+A client update can break the hooks; the page reports errors to `cache/client.log`. Replays of older engine versions go
+through the official `/old/` client builds, like the web client does.
 
 ## CI
 
-`.gitlab-ci.yml`: syntax and extension lint on every push, Windows portable build plus a GitLab release on tags, and a
-manual Firefox signing job (`WEB_EXT_API_KEY` / `WEB_EXT_API_SECRET` as masked CI variables). `ci/gitlab-runner/` has a
-compose file for a docker-executor runner; register it once with a runner token from the project's CI/CD settings.
-
-## Layout
-
-`main.js` Electron main process. `serve.js` http server: client file cache and patches, map/mod CDN proxy, ladder API
-proxy, replay download and upload, country flag store. `cdreplay.js` in-page controller (`window.cdr` in DevTools, F12).
-`browser.html` game browser. `cache/` everything downloaded or generated (gitignored).
-
-Client internals are referenced by SystemJS module name (`gui/screen/replay/ReplayScreen`, `game/Game`, ...) and
-patched on prototypes; a client update can break them, `cache/client.log` receives the page's error reports.
+`.gitlab-ci.yml` (checks on push, Windows build and release on tags, manual Firefox signing) and
+`.github/workflows/release.yml` (build and release on tags). `ci/gitlab-runner/` holds a compose file for a
+docker-executor GitLab runner.

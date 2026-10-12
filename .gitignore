@@ -4,3 +4,4 @@ dist/
 dist-ext/
 web-ext-config.cjs
 dist-offline/
+chrome-extension/.amo-upload-uuid
