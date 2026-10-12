@@ -1,0 +1,6 @@
+cache/
+node_modules/
+dist/
+dist-ext/
+web-ext-config.cjs
+dist-offline/

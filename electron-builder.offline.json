@@ -1,0 +1,13 @@
+{
+  "extends": null,
+  "appId": "org.zzattack.cdreplay",
+  "productName": "cdreplay",
+  "files": ["main.js", "serve.js", "cdreplay.js", "browser.html", "official-maps.txt"],
+  "extraResources": [
+    { "from": "cache/client", "to": "snapshot/client" },
+    { "from": "cache/cdn", "to": "snapshot/cdn" }
+  ],
+  "directories": { "output": "dist-offline" },
+  "win": { "target": [{ "target": "portable" }], "signAndEditExecutable": false },
+  "portable": { "artifactName": "cdreplay-offline.exe" }
+}

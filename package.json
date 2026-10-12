@@ -1,0 +1,50 @@
+{
+  "name": "cdreplay",
+  "version": "0.1.0",
+  "description": "Standalone Chrono Divide replay viewer with seeking",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "serve": "node serve.js",
+    "dist": "electron-builder --win",
+    "dist:offline": "electron-builder --win --config electron-builder.offline.json",
+    "ext:lint": "web-ext lint --source-dir chrome-extension",
+    "ext:sign": "web-ext sign --source-dir chrome-extension --artifacts-dir dist-ext --channel unlisted"
+  },
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "electron": "^44.7.0",
+    "electron-builder": "^26.15.3",
+    "web-ext": "^10.7.0"
+  },
+  "build": {
+    "appId": "org.zzattack.cdreplay",
+    "productName": "cdreplay",
+    "files": [
+      "main.js",
+      "serve.js",
+      "cdreplay.js",
+      "browser.html",
+      "official-maps.txt"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "portable"
+        },
+        {
+          "target": "zip"
+        }
+      ],
+      "signAndEditExecutable": false
+    },
+    "portable": {
+      "artifactName": "cdreplay.exe"
+    },
+    "artifactName": "cdreplay-${version}-win.${ext}"
+  }
+}

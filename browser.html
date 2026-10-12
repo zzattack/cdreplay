@@ -1,0 +1,294 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>cdreplay</title>
+<style>
+:root { --bg: #0b0e13; --panel: #151b26; --border: #2a3444; --text: #e8ecf4; --dim: #8e9bb0; --accent: #5aa0ff; --win: #5dca50; --loss: #f64c4c; }
+* { box-sizing: border-box; }
+body { margin: 0; height: 100vh; display: flex; flex-direction: column; background: var(--bg); color: var(--text); font: 13px/1.4 system-ui, sans-serif; }
+header { display: flex; gap: 10px; align-items: center; padding: 8px 14px; border-bottom: 1px solid var(--border); background: var(--panel); }
+header h1 { margin: 0 10px 0 0; font-size: 16px; font-weight: 600; }
+select, input[type=text], button { background: #1c2536; color: var(--text); border: 1px solid var(--border); border-radius: 5px; padding: 5px 9px; font: inherit; }
+button { cursor: pointer; }
+button:hover { border-color: var(--accent); }
+.tab.active { border-color: var(--accent); background: #22304a; }
+main { flex: 1; display: flex; min-height: 0; }
+#list { flex: 1; overflow: auto; padding: 8px 14px; }
+#side { width: 300px; border-left: 1px solid var(--border); background: var(--panel); overflow: auto; padding: 10px 14px; }
+#side h2 { margin: 0 0 6px; font-size: 13px; color: var(--dim); text-transform: uppercase; letter-spacing: .5px; }
+table { width: 100%; border-collapse: collapse; }
+td, th { padding: 5px 8px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+td:nth-child(2) { white-space: normal; }
+th { color: var(--dim); font-weight: 500; position: sticky; top: 0; background: var(--bg); }
+tr.game { cursor: pointer; }
+tr.game:hover { background: #1a2333; }
+tr.noreplay { opacity: .45; cursor: default; }
+.p { font-weight: 600; }
+.win { color: var(--win); }
+.loss { color: var(--loss); }
+.dim { color: var(--dim); }
+.mmr { font-variant-numeric: tabular-nums; }
+.vs { color: var(--dim); padding: 0 6px; }
+.flag { height: 14px; vertical-align: -2px; margin-left: 4px; }
+.rank { width: 36px; color: var(--dim); }
+tr.player { cursor: pointer; }
+tr.player:hover { background: #1a2333; }
+.filters { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; padding: 6px 0 10px; color: var(--dim); }
+.filters label { display: inline-flex; gap: 5px; align-items: center; }
+.filters input[type=number] { width: 64px; }
+.range2 { position: relative; display: inline-block; width: 150px; height: 18px; }
+.range2 input { position: absolute; left: 0; top: 0; width: 100%; margin: 0; pointer-events: none; -webkit-appearance: none; background: transparent; }
+.range2 input::-webkit-slider-runnable-track { height: 4px; background: var(--border); border-radius: 2px; }
+.range2 input::-webkit-slider-thumb { -webkit-appearance: none; pointer-events: auto; width: 14px; height: 14px; margin-top: -5px; border-radius: 50%; background: var(--accent); cursor: pointer; }
+.dur { min-width: 70px; font-variant-numeric: tabular-nums; }
+#drop { border: 2px dashed var(--border); border-radius: 8px; padding: 18px; text-align: center; color: var(--dim); margin-bottom: 14px; }
+#drop.over { border-color: var(--accent); color: var(--text); background: #16213a; }
+#status { color: var(--dim); margin-left: auto; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.dragging #drop { border-color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+	<h1>Region</h1>
+	<select id="server"><option value="eu">EU</option><option value="sea">SEA</option></select>
+	<button class="tab" data-tab="standings">Ladders</button>
+	<button class="tab" data-tab="recent">Recent games</button>
+	<input type="text" id="player" placeholder="player name" size="18">
+	<button id="search">Games of player</button>
+	<span id="status"></span>
+</header>
+<main>
+	<div id="list"></div>
+	<div id="side">
+		<h2>Local replay</h2>
+		<div id="drop">Drop a .rpl file here<br><br><button id="pick">Choose file</button></div>
+		<input type="file" id="file" accept=".rpl" hidden>
+		<h2>Keys</h2>
+		<div class="dim">In the replay: comma/period seek 10 s, &lt; &gt; seek 1 min. Quit from the game menu returns here.</div>
+	</div>
+</main>
+<script>
+const SKU = 16640;
+const COUNTRIES = ["America", "Korea", "France", "Germany", "Great Britain", "Libya", "Iraq", "Cuba", "Russia"];
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const state = { tab: "recent", server: localStorage.getItem("cdreplay.server") || "eu", cursor: null, games: [], player: "", recent: { ladder: "", both: false, names: null } };
+// the view survives a page reload (the first replay replaces this page with the client)
+const saved = (() => { try { return JSON.parse(localStorage.getItem("cdreplay.view") || "{}"); } catch { return {}; } })();
+const saveView = () => { try { localStorage.setItem("cdreplay.view", JSON.stringify({ tab: state.tab, player: state.player, ladder: state.ladder, filter: state.filter })); } catch {} };
+$("server").value = state.server;
+
+const api = (path, body) => fetch(`/api/ladder/${state.server}/${path}`, body ? { method: "POST", body: JSON.stringify(body) } : {})
+	.then(r => r.ok ? r.json() : Promise.reject(new Error("ladder " + r.status)));
+const status = t => { $("status").textContent = t; };
+const when = ms => new Date(ms).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" });
+const dur = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
+function openReplay(id) {
+	// the end screen shows ladder data (mmr, ranked, region) the replay file does not hold
+	const g = state.games.find(g => g.id === id);
+	if (g) try { localStorage.setItem("cdreplay.game." + id, JSON.stringify({ ...g, server: state.server })); } catch {}
+	// embedded in the client page: switch there without reloading the engine
+	if (window.parent !== window && window.parent.cdr) return window.parent.cdr.openReplay(id);
+	const base = location.origin + "/";
+	location.href = base + "#/replay/" + encodeURIComponent(`${base}replay/${id}.rpl`);
+}
+
+function playerCell(p) {
+	const m = p.mmr?.value, c = p.mmr?.change;
+	return `<span class="p ${p.result}">${esc(p.name)}</span> <img class="flag" src="/flags/${+p.countryId}.png" onerror="this.remove()"> <span class="dim">${COUNTRIES[p.countryId] ?? ""}</span>` +
+		(m ? ` <span class="mmr dim">${m}${c ? ` (${c > 0 ? "+" : ""}${c})` : ""}</span>` : "");
+}
+
+/* filters on a player's game list; applied to the pages loaded so far */
+state.filter = { map: "", minDur: "", maxDur: "", minMmr: "", self: "", opp: "", result: "", ...(saved.filter || {}) };
+const SIDES = ["Allied", "Soviet"];
+function matches(g) {
+	const f = state.filter, ps = g.participants.filter(p => p.type === "player");
+	const me = ps.find(p => p.name.toLowerCase() === state.player.toLowerCase()), opp = ps.find(p => p !== me);
+	if (f.map && g.map.name !== f.map) return false;
+	if (f.minDur && g.durationSeconds < +f.minDur * 60) return false;
+	if (f.maxDur && +f.maxDur < DUR_MAX && g.durationSeconds > +f.maxDur * 60) return false;
+	if (f.minMmr && !(opp?.mmr?.value >= +f.minMmr)) return false;
+	if (f.self !== "" && String(me?.side) !== f.self) return false;
+	if (f.opp !== "" && String(opp?.side) !== f.opp) return false;
+	if (f.result && me?.result !== f.result) return false;
+	return true;
+}
+const DUR_MAX = 60; // minutes; the top end means no limit
+const durLabel = f => `${f.minDur || 0} - ${!f.maxDur || +f.maxDur >= DUR_MAX ? "∞" : f.maxDur} min`;
+function filterBar() {
+	const f = state.filter, maps = [...new Set(state.games.map(g => g.map.name))].sort();
+	const titles = Object.fromEntries(state.games.map(g => [g.map.name, g.map.title]));
+	const sideOpts = v => `<option value="">any</option>${SIDES.map((n, i) => `<option value="${i}"${v === String(i) ? " selected" : ""}>${n}</option>`).join("")}`;
+	return `<div class="filters">
+		<label>Map <select data-f="map"><option value="">any</option>${maps.map(m => `<option value="${esc(m)}"${f.map === m ? " selected" : ""}>${esc(titles[m])}</option>`).join("")}</select></label>
+		<label>Length <span class="range2"><input data-f="minDur" type="range" min="0" max="${DUR_MAX}" value="${f.minDur || 0}"><input data-f="maxDur" type="range" min="0" max="${DUR_MAX}" value="${f.maxDur || DUR_MAX}"></span><span class="dur">${durLabel(f)}</span></label>
+		<label>Opponent MMR &ge; <input data-f="minMmr" type="number" min="0" step="50" value="${f.minMmr}" size="5"></label>
+		<label>Self <select data-f="self">${sideOpts(f.self)}</select></label>
+		<label>Opponent <select data-f="opp">${sideOpts(f.opp)}</select></label>
+		<label>Result <select data-f="result"><option value="">any</option><option value="win"${f.result === "win" ? " selected" : ""}>win</option><option value="loss"${f.result === "loss" ? " selected" : ""}>loss</option></select></label>
+	</div>`;
+}
+
+function renderGames(append) {
+	const games = state.player ? state.games.filter(matches) : state.games.filter(inLadder);
+	const rows = games.map(g => {
+		const ps = g.participants.filter(p => p.type === "player");
+		const ok = g.completed && g.replayUrl && g.durationSeconds > 0;
+		return `<tr class="game${ok ? "" : " noreplay"}" data-id="${ok ? esc(g.id) : ""}" data-map="${esc(g.map.name)}">` +
+			`<td class="dim">${when(g.startedAt)}</td><td>${ps.map(playerCell).join('<span class="vs">vs</span>')}</td>` +
+			`<td>${esc(g.map.title)}</td><td class="mmr">${dur(g.durationSeconds)}</td><td class="dim">${ps.every(p => p.ranked) ? "ranked" : ""}</td></tr>`;
+	}).join("");
+	$("list").innerHTML = (state.player ? filterBar() : ladderBar()) +
+		`<table><thead><tr><th>Started</th><th>Players</th><th>Map</th><th>Length</th><th></th></tr></thead><tbody>${rows}</tbody></table>` +
+		(state.cursor ? '<p><button id="more">Load more</button></p>' : "");
+	$("list").querySelectorAll("[data-f]").forEach(el => el.onchange = () => { state.filter[el.dataset.f] = el.value; saveView(); renderGames(); });
+	// the two length thumbs may not cross; the label follows while dragging
+	$("list").querySelectorAll(".range2 input").forEach(el => el.oninput = () => {
+		const [lo, hi] = el.parentElement.querySelectorAll("input");
+		if (+lo.value > +hi.value) (el === lo ? hi : lo).value = el.value;
+		el.parentElement.nextElementSibling.textContent = durLabel({ minDur: lo.value, maxDur: hi.value });
+	});
+	if (state.player) status(`${games.length} of ${state.games.length} games of ${state.player}`);
+	else if (state.recent.ladder !== "") status(`${games.length} of ${state.games.length} games in ladder`);
+	$("list").querySelectorAll("[data-r]").forEach(el => el.onchange = async () => {
+		const f = state.recent;
+		if (el.dataset.r === "both") f.both = el.checked;
+		else { f.ladder = el.value; f.names = null; }
+		if (f.ladder !== "") { status("loading ladder…"); try { f.names = await membersOf(+f.ladder); } catch (e) { status(e.message); return; } }
+		renderGames();
+		// a ladder filter can leave a page empty: fetch further pages until something shows
+		for (let i = 0; i < 6 && f.ladder !== "" && state.cursor && state.games.filter(inLadder).length < 15; i++) await loadGames(true);
+	});
+	$("list").querySelectorAll("tr.game[data-id]").forEach(tr => { if (tr.dataset.id) tr.onclick = () => openReplay(tr.dataset.id); });
+	checkMaps();
+	const more = $("more");
+	if (more) more.onclick = () => loadGames(true);
+}
+
+/* recent games per ladder: a game record carries no ladder, so the chosen ladder's standings (at most 4 pages) are
+   fetched on demand and games are matched by player name */
+const ladderMembers = new Map(); // ladderId -> { at, names:Set }
+async function ladderList() {
+	if (!state.ladders) {
+		const info = await api(`ladder/${SKU}/current`);
+		state.ladders = info.ladders.filter(l => l.type === "1v1");
+		state.ladder = state.ladders.some(l => l.id === saved.ladder) ? saved.ladder : state.ladders[0].id;
+	}
+	return state.ladders;
+}
+async function membersOf(ladderId) {
+	const c = ladderMembers.get(ladderId);
+	if (c && Date.now() - c.at < 5 * 60000) return c.names;
+	const names = new Set();
+	for (let start = 1, total = Infinity; start <= total; start += 25) {
+		const page = await api(`ladder/${SKU}/1v1/current/rungsearch`, { ladderId, start, count: 25 });
+		total = page.totalCount;
+		page.records.forEach(r => names.add(r.name.toLowerCase()));
+		if (!page.records.length) break;
+	}
+	ladderMembers.set(ladderId, { at: Date.now(), names });
+	return names;
+}
+function ladderBar() {
+	const f = state.recent;
+	return `<div class="filters"><label>Ladder <select data-r="ladder"><option value="">any</option>${(state.ladders || []).map(l =>
+		`<option value="${l.id}"${String(f.ladder) === String(l.id) ? " selected" : ""}>${esc(l.name)}${l.divisionName ? " " + esc(l.divisionName) : ""}</option>`).join("")}</select></label>
+		<label><input type="checkbox" data-r="both"${f.both ? " checked" : ""}> both players in it</label></div>`;
+}
+function inLadder(g) {
+	const f = state.recent;
+	if (f.ladder === "" || !f.names) return true;
+	const ps = g.participants.filter(p => p.type === "player").map(p => f.names.has(p.name.toLowerCase()));
+	return f.both ? ps.every(Boolean) : ps.some(Boolean);
+}
+
+/* maps the client cannot obtain (custom maps absent from the resource CDN) make a replay unplayable: grey those rows */
+const mapOk = new Map();
+async function checkMaps() {
+	const names = [...new Set([...$("list").querySelectorAll("tr.game[data-map]")].map(tr => tr.dataset.map))];
+	await Promise.all(names.map(async name => {
+		if (!mapOk.has(name)) mapOk.set(name, fetch(`/api/mapcheck?name=${encodeURIComponent(name)}`).then(r => r.json()).then(j => j.ok).catch(() => true));
+		if (await mapOk.get(name)) return;
+		$("list").querySelectorAll(`tr.game[data-map="${CSS.escape(name)}"]`).forEach(tr => { tr.classList.add("noreplay"); tr.title = "map not available"; tr.onclick = null; });
+	}));
+}
+
+async function loadGames(more) {
+	if (!state.player) try { await ladderList(); } catch {}
+	const q = new URLSearchParams({ gameSku: SKU, limit: 50 });
+	if (state.player) q.set("player", state.player);
+	if (more && state.cursor) q.set("cursor", state.cursor);
+	status("loading…");
+	try {
+		const page = await api(`api/v1/games?${q}`);
+		state.games = more ? state.games.concat(page.games) : page.games;
+		state.cursor = page.nextCursor || null;
+		renderGames();
+		if (!state.player) status(`${state.games.length} games`);
+	} catch (e) { status(e.message); }
+}
+
+async function loadStandings(more) {
+	status("loading…");
+	try {
+		await ladderList();
+		const start = more ? state.standings.length + 1 : 1;
+		const page = await api(`ladder/${SKU}/1v1/current/rungsearch`, { ladderId: state.ladder, start, count: 25 });
+		state.standings = more ? state.standings.concat(page.records) : page.records;
+		const sel = `<select id="ladder">${state.ladders.map(l => `<option value="${l.id}"${l.id === state.ladder ? " selected" : ""}>${esc(l.name)}${l.divisionName ? " " + esc(l.divisionName) : ""}</option>`).join("")}</select>`;
+		$("list").innerHTML = `<p>${sel}</p><table><thead><tr><th class="rank">#</th><th>Player</th><th>MMR</th><th>W</th><th>L</th></tr></thead><tbody>` +
+			state.standings.map(r => `<tr class="player" data-name="${esc(r.name)}"><td class="rank">${r.rank}</td><td class="p">${esc(r.name)}</td>` +
+				`<td class="mmr">${r.mmr}</td><td class="win">${r.wins ?? ""}</td><td class="loss">${r.losses ?? ""}</td></tr>`).join("") + "</tbody></table>" +
+			(state.standings.length < page.totalCount ? '<p><button id="more">Load more</button></p>' : "");
+		$("list").querySelectorAll("tr.player").forEach(tr => tr.onclick = () => { $("player").value = tr.dataset.name; searchPlayer(); });
+		$("ladder").onchange = () => { state.ladder = +$("ladder").value; saveView(); loadStandings(); };
+		const btn = $("more");
+		if (btn) btn.onclick = () => loadStandings(true);
+		status(`${state.standings.length} of ${page.totalCount}`);
+	} catch (e) { status(e.message); }
+}
+
+function setTab(tab) {
+	state.tab = tab;
+	document.querySelectorAll(".tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+	if (tab === "standings") loadStandings();
+	else { state.player = ""; loadGames(); }
+	saveView();
+}
+function searchPlayer() {
+	state.player = $("player").value.trim();
+	state.tab = "player";
+	document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
+	loadGames();
+	saveView();
+}
+
+document.querySelectorAll(".tab").forEach(b => b.onclick = () => setTab(b.dataset.tab));
+$("search").onclick = searchPlayer;
+$("player").onkeydown = e => { if (e.key === "Enter") searchPlayer(); };
+$("server").onchange = () => { state.server = $("server").value; state.ladders = null; localStorage.setItem("cdreplay.server", state.server); setTab(state.tab); };
+
+/* local replay: upload to the server's replay cache, then open it like a ladder replay */
+async function upload(file) {
+	status("uploading " + file.name);
+	const r = await fetch("/upload", { method: "POST", headers: { "X-Filename": encodeURIComponent(file.name) }, body: file });
+	if (!r.ok) return status("upload failed");
+	openReplay((await r.json()).id);
+}
+$("pick").onclick = () => $("file").click();
+$("file").onchange = () => { if ($("file").files[0]) upload($("file").files[0]); };
+for (const t of ["dragenter", "dragover"]) document.addEventListener(t, e => { e.preventDefault(); $("drop").classList.add("over"); });
+for (const t of ["dragleave", "drop"]) document.addEventListener(t, e => { e.preventDefault(); if (t === "drop" || e.target === document.body) $("drop").classList.remove("over"); });
+document.addEventListener("drop", e => { const f = [...e.dataTransfer.files].find(f => /\.rpl$/i.test(f.name)); if (f) upload(f); });
+
+window.addEventListener("message", e => { if (e.data?.error) status("⚠ " + e.data.error); });
+// a failed load may have happened before this frame existed: the client page keeps the message
+try { const err = window.parent !== window && window.parent.cdr?.lastError; if (err) { status("⚠ " + err); window.parent.cdr.lastError = null; } } catch {}
+if (saved.tab === "player" && saved.player) { $("player").value = saved.player; searchPlayer(); }
+else setTab(saved.tab === "standings" ? "standings" : "recent");
+</script>
+</body>
+</html>
