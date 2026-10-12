@@ -12,7 +12,7 @@
     "ext:lint": "web-ext lint --source-dir chrome-extension",
     "ext:sign": "web-ext sign --source-dir chrome-extension --artifacts-dir dist-ext --channel unlisted"
   },
-  "license": "UNLICENSED",
+  "license": "MIT",
   "devDependencies": {
     "electron": "^44.7.0",
     "electron-builder": "^26.15.3",

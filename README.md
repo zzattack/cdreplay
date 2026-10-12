@@ -49,6 +49,13 @@ Keys in a replay: space pause, comma/period seek 10 s, `<` `>` seek 1 min, F12 d
   counters and production queues are heavily influenced by [doof88](https://www.twitch.tv/doof88)'s stream overlay.
 - Programmed by Claude (Anthropic), directed by Frank Razenberg.
 
+## Licence
+
+The code in this repository is MIT licensed. That covers cdreplay's own files only. The Chrono Divide client that the
+app downloads and patches at run time, and the Red Alert 2 game files it asks for, are not covered and are not
+included: Chrono Divide's client is unlicensed proprietary software and its terms grant no right to reproduce it, which
+is why the offline build must not be distributed and why no client files are ever committed or released here.
+
 ## From source
 
 ```
