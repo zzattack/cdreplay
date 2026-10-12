@@ -736,6 +736,7 @@ function mountUi(screen) {
 	range.oninput = () => { dragging = true; fill(); clockEl.textContent = clock(+range.value) + " / " + clock(endTick()); };
 	range.onchange = () => { dragging = false; range.blur(); seek(+range.value); }; // no focus ring, arrow keys stay with the game
 	root.querySelectorAll("[data-toggle]").forEach(cb => cb.onchange = () => {
+		cb.blur();
 		toggles[cb.dataset.toggle] = cb.checked;
 		saveToggles();
 		if (ui.lines) ui.lines.enabled.value = toggles.lines;
@@ -750,7 +751,9 @@ function mountUi(screen) {
 	for (const t of ["pointerdown", "pointerup", "mousedown", "mouseup", "click"]) window.addEventListener(t, ui.stopper, true);
 	ui.progress = t => { busy.textContent = t === null ? "" : "seeking " + clock(t); };
 	document.addEventListener("keydown", ui.onKey = e => {
-		if (["INPUT", "SELECT", "TEXTAREA"].includes(e.target.tagName)) return;
+		// only real text entry keeps its keys; a focused checkbox or slider must not swallow space
+		const t = e.target, tag = t.tagName;
+		if (tag === "TEXTAREA" || tag === "SELECT" || (tag === "INPUT" && !["checkbox", "range", "button"].includes(t.type))) return;
 		const step = { ",": -600, ".": 600, "<": -3600, ">": 3600 }[e.key];
 		if (e.key === " ") {
 			const g = game();

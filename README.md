@@ -11,11 +11,14 @@ and adds a seek bar and observer overlays on top of it. All rendering and simula
 - **Seek bar**: jump anywhere in a replay, forwards and backwards, media-player style. Backward seeks use keyframes
   (extra game instances parked at intervals), so a jump takes about a second.
 - **Unit counters**: per player, in the sidebar, with the game's own cameos: miners, war factories, tanks, dogs, and
-  whatever else is on the field, plus credits and total spent.
-- **Production queues**: what each player is building in every queue, with cameos and progress.
+  whatever else is on the field, plus credits and total spent. Heavily influenced by the stream overlay of
+  livestreamer doof88.
+- **Production queues**: what each player is building in every queue, with cameos and progress. Also after doof88's
+  overlay.
 - **Target lines**: the game's target lines for every unit of every player, flashing on new orders.
 - **APM tracker**: actions per minute per player, live and as a graph on the end screen.
-- Also: a match header (MMR, power, credits, map, region, date), health bars for all units, the owner's current
+- Also: a match header (MMR, power, credits, map, region, date) mimicking the one on
+  [RA2CastTV](https://www.twitch.tv/ra2casttv)'s casts, health bars for all units, the owner's current
   selection, an end screen with units built/lost/killed and graphs of credits earned, army value and APM, team games
   grouped by alliance.
 - **Game browser**: ladder standings, recent games per ladder, a player's games with filters (map, length, opponent
@@ -31,7 +34,9 @@ and adds a seek bar and observer overlays on top of it. All rendering and simula
    Everything is kept in `%LOCALAPPDATA%\cdreplay`.
 3. Optional: open replay links from the ladder site directly in the app with the browser extension. Chrome:
    `chrome://extensions`, developer mode, "Load unpacked", pick the `chrome-extension` folder of this repository.
-   Firefox: install the signed `.xpi` from the release. Append `&web` to a replay link to get the web client instead.
+   Chrome cannot install an extension file outside the Web Store, so the release's `cdreplay-chrome-*.zip` is the same
+   folder to extract and load unpacked. Firefox: install the signed `.xpi` from the release. Append `&web` to a replay
+   link to get the web client instead.
 
 Keys in a replay: space pause, comma/period seek 10 s, `<` `>` seek 1 min, F12 developer tools (`window.cdr`).
 
@@ -40,8 +45,8 @@ Keys in a replay: space pause, comma/period seek 10 s, `<` `>` seek 1 min, F12 d
 - [Chrono Divide](https://chronodivide.com) by its author, which this tool is entirely built on. cdreplay is not
   affiliated with Chrono Divide; it downloads the official client on first run and patches it in memory. Nothing of
   Chrono Divide or Red Alert 2 is included in this repository or in the builds.
-- The unit counters and stream overlays remake elements of the overlays used on the Twitch channel
-  [RA2CastTV](https://www.twitch.tv/ra2casttv) and by livestreamer doof88.
+- The match header is mimicked from the Twitch channel [RA2CastTV](https://www.twitch.tv/ra2casttv); the unit
+  counters and production queues are heavily influenced by livestreamer doof88's stream overlay.
 - Programmed by Claude (Anthropic), directed by Frank Razenberg.
 
 ## From source
