@@ -176,7 +176,9 @@ function setSpeed(mult) {
 	if (wasPaused && mult > 0) s.gameTurnMgr.doGameTurn(performance.now());
 }
 const pause = () => { const g = game(); if (g) g.desiredSpeed.value = Number.EPSILON; };
-const isPaused = () => game()?.speed.value === Number.EPSILON;
+// desiredSpeed, not speed: the turn manager copies speed over only at the end of the next turn, so a space press
+// in that window would otherwise read "running" and save EPSILON as the resume speed
+const isPaused = () => game()?.desiredSpeed.value === Number.EPSILON;
 let lastSpeed = 1;
 
 const yieldTask = () => new Promise(r => { const c = new MessageChannel(); c.port1.onmessage = () => r(); c.port2.postMessage(0); });
@@ -631,7 +633,7 @@ function mountUi(screen) {
 	#cdreplay button:hover { border-color: #5aa0ff; }
 	#cdreplay .stop { position: fixed; z-index: 10000; padding: 3px 10px; font-size: 12px; background: rgba(0,0,0,.6); }
 	#cdreplay.menu .stats, #cdreplay.menu .counters, #cdreplay.menu .bar, #cdreplay.menu .stop, #cdreplay.menu .header { display: none; }
-	#cdreplay .header { position: fixed; z-index: 10000; transform: translateX(-50%); pointer-events: none; text-align: center; font: 12px system-ui, sans-serif; }
+	#cdreplay .header { position: fixed; z-index: 10000; transform: translateX(-50%); pointer-events: none; display: flex; flex-direction: column; align-items: center; font: 12px system-ui, sans-serif; }
 	#cdreplay .hrow { display: inline-flex; align-items: center; gap: 14px; padding: 4px 16px; background: rgba(6,10,18,.3); text-shadow: 0 1px 3px #000; border: 1px solid #263043; border-top: 0; border-radius: 0 0 6px 6px; }
 	#cdreplay .hs { display: inline-flex; align-items: center; gap: 8px; }
 	#cdreplay .hn { font: bold 17px system-ui, sans-serif; letter-spacing: .02em; }
