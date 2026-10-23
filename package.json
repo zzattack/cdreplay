@@ -1,6 +1,6 @@
 {
   "name": "cdreplay",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Standalone Chrono Divide replay viewer with seeking",
   "private": true,
   "main": "main.js",
