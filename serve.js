@@ -103,6 +103,35 @@ async function replayFile(id) {
 	throw err;
 }
 
+/* the ladder service allows about one request per 10 s per ip (429 with Retry-After beyond that): responses are
+   cached for a minute, identical requests share one fetch, requests go out one at a time with a gap, and a 429 is
+   retried a few times after the wait the server asks for */
+const LADDER_GAP = 2000, LADDER_TTL = 60000;
+const ladderCache = new Map(); // method + url + body -> { at, body } or { pending }
+let ladderQueue = Promise.resolve();
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function ladderFetch(url, method, reqBody) {
+	const key = method + url + (reqBody || "");
+	const c = ladderCache.get(key);
+	if (c?.pending) return c.pending;
+	if (c && Date.now() - c.at < LADDER_TTL) return c.body;
+	const pending = ladderQueue.then(async () => {
+		for (let tries = 0; ; tries++) {
+			const r = await fetch(url, { method, body: reqBody,
+				headers: { "User-Agent": UA, "Accept": "application/json", "Content-Type": "application/json" } });
+			// a rejected attempt counts against the window too, so wait a little longer than asked
+			if (r.status === 429 && tries < 3) { await sleep(1000 * (+r.headers.get("retry-after") || 10) + LADDER_GAP); continue; }
+			const body = Buffer.from(await r.arrayBuffer());
+			if (!r.ok) throw Object.assign(new Error(`ladder ${r.status}`), { status: r.status });
+			return body;
+		}
+	});
+	ladderQueue = pending.then(() => sleep(LADDER_GAP), () => sleep(LADDER_GAP));
+	ladderCache.set(key, { pending });
+	pending.then(body => ladderCache.set(key, { at: Date.now(), body }), () => ladderCache.delete(key));
+	return pending;
+}
+
 const server = http.createServer(async (req, res) => {
 	const url = new URL(req.url, `http://localhost:${PORT}`);
 	try {
@@ -132,12 +161,9 @@ const server = http.createServer(async (req, res) => {
 			if (!/^[a-z]+$/.test(region)) throw Object.assign(new Error("bad region"), { status: 400 });
 			const chunks = [];
 			for await (const c of req) chunks.push(c);
-			const r = await fetch(`https://wol-${region}.chronodivide.com/${rest.join("/")}${url.search}`, {
-				method: req.method, headers: { "User-Agent": UA, "Accept": "application/json", "Content-Type": "application/json" },
-				body: req.method === "POST" ? Buffer.concat(chunks) : undefined });
-			body = Buffer.from(await r.arrayBuffer());
+			body = await ladderFetch(`https://wol-${region}.chronodivide.com/${rest.join("/")}${url.search}`, req.method,
+				req.method === "POST" ? Buffer.concat(chunks) : undefined);
 			type = "application/json";
-			if (!r.ok) throw Object.assign(new Error(`ladder ${r.status}`), { status: r.status });
 		} else if (req.method === "POST" && url.pathname === "/upload") {
 			// a replay dropped on the browser page; served back as /replay/<id>.rpl
 			const chunks = [];
