@@ -22,7 +22,7 @@ and adds a seek bar and observer overlays on top of it. All rendering and simula
   selection, an end screen with units built/lost/killed and graphs of credits earned, army value and APM, team games
   grouped by alliance.
 - **Game browser**: ladder standings, recent games per ladder, a player's games with filters (map, length, opponent
-  MMR, factions, result), drag-and-drop of local `.rpl` files. Switching replays takes about a second.
+  MMR, factions, result), favorite players, drag-and-drop of local `.rpl` files. Switching replays takes about a second.
 
 ![Game browser](docs/browser.png)
 

@@ -42,6 +42,11 @@ tr.player:hover { background: #1a2333; }
 .range2 input::-webkit-slider-runnable-track { height: 4px; background: var(--border); border-radius: 2px; }
 .range2 input::-webkit-slider-thumb { -webkit-appearance: none; pointer-events: auto; width: 14px; height: 14px; margin-top: -5px; border-radius: 50%; background: var(--accent); cursor: pointer; }
 .dur { min-width: 70px; font-variant-numeric: tabular-nums; }
+.fav { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; cursor: pointer; }
+.fav:hover .p { color: var(--accent); }
+.fav .x { color: var(--dim); padding: 0 4px; }
+.fav .x:hover { color: var(--loss); }
+#favs { margin-bottom: 14px; }
 #drop { border: 2px dashed var(--border); border-radius: 8px; padding: 18px; text-align: center; color: var(--dim); margin-bottom: 14px; }
 #drop.over { border-color: var(--accent); color: var(--text); background: #16213a; }
 #status { color: var(--dim); margin-left: auto; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -56,11 +61,14 @@ body.dragging #drop { border-color: var(--accent); }
 	<button class="tab" data-tab="recent">Recent games</button>
 	<input type="text" id="player" placeholder="player name" size="18">
 	<button id="search">Games of player</button>
+	<button id="fav" title="favorite player" hidden>☆</button>
 	<span id="status"></span>
 </header>
 <main>
 	<div id="list"></div>
 	<div id="side">
+		<h2>Favorite players</h2>
+		<div id="favs"></div>
 		<h2>Local replay</h2>
 		<div id="drop">Drop a .rpl file here<br><br><button id="pick">Choose file</button></div>
 		<input type="file" id="file" accept=".rpl" hidden>
@@ -183,9 +191,9 @@ async function membersOf(ladderId) {
 	const c = ladderMembers.get(ladderId);
 	if (c && Date.now() - c.at < 5 * 60000) return c.names;
 	const names = new Set();
-	for (let start = 1, total = Infinity; start <= total; start += 25) {
+	for (let start = 1, total = 100; start <= total; start += 25) {
 		const page = await api(`ladder/${SKU}/1v1/current/rungsearch`, { ladderId, start, count: 25 });
-		total = page.totalCount;
+		total = Math.min(total, page.totalCount);
 		page.records.forEach(r => names.add(r.name.toLowerCase()));
 		if (!page.records.length) break;
 	}
@@ -257,6 +265,7 @@ function setTab(tab) {
 	if (tab === "standings") loadStandings();
 	else { state.player = ""; loadGames(); }
 	saveView();
+	renderFavs();
 }
 function searchPlayer() {
 	state.player = $("player").value.trim();
@@ -264,7 +273,35 @@ function searchPlayer() {
 	document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
 	loadGames();
 	saveView();
+	renderFavs();
 }
+
+/* favorite players: a local list per region, one click shows their games */
+const favs = (() => { try { return JSON.parse(localStorage.getItem("cdreplay.favs") || "[]"); } catch { return []; } })();
+const favIndex = () => favs.findIndex(f => f.server === state.server && f.name.toLowerCase() === state.player.toLowerCase());
+function renderFavs() {
+	$("fav").hidden = state.tab !== "player" || !state.player;
+	$("fav").textContent = favIndex() >= 0 ? "★" : "☆";
+	$("favs").innerHTML = favs.length ? favs.map((f, i) => `<div class="fav" data-i="${i}"><span><span class="p">${esc(f.name)}</span> <span class="dim">${esc(f.server.toUpperCase())}</span></span><span class="x" title="remove">✕</span></div>`).join("")
+		: '<div class="dim">Open a player\'s games and press ☆</div>';
+	$("favs").querySelectorAll(".fav").forEach(el => {
+		const f = favs[el.dataset.i];
+		el.onclick = () => {
+			if (f.server !== state.server) { $("server").value = state.server = f.server; state.ladders = null; localStorage.setItem("cdreplay.server", state.server); }
+			$("player").value = f.name;
+			searchPlayer();
+		};
+		el.querySelector(".x").onclick = e => { e.stopPropagation(); favs.splice(el.dataset.i, 1); saveFavs(); };
+	});
+}
+function saveFavs() { try { localStorage.setItem("cdreplay.favs", JSON.stringify(favs)); } catch {} renderFavs(); }
+$("fav").onclick = () => {
+	const i = favIndex();
+	// prefer the name as the ladder spells it over what was typed
+	const name = state.games.flatMap(g => g.participants).find(p => p.name.toLowerCase() === state.player.toLowerCase())?.name || state.player;
+	if (i >= 0) favs.splice(i, 1); else favs.push({ name, server: state.server });
+	saveFavs();
+};
 
 document.querySelectorAll(".tab").forEach(b => b.onclick = () => setTab(b.dataset.tab));
 $("search").onclick = searchPlayer;
