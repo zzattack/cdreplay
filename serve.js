@@ -201,7 +201,7 @@ const server = http.createServer(async (req, res) => {
 		} else {
 			body = await clientFile(url.pathname, url.search.slice(1));
 			const base = path.basename(url.pathname) || "index.html";
-			type = mime(url.pathname === "/" ? "index.html" : url.pathname);
+			type = mime(url.pathname.endsWith("/") ? "index.html" : url.pathname);
 			if (base === "index.html" || url.pathname.endsWith("/")) body = Buffer.from(patchIndex(body.toString("utf8")));
 			else if (base === "ra2web.min.js") body = Buffer.from(body.toString("utf8").replace("sleep(this.config.devMode?0:5e3)", "sleep(0)")); // 5 s minimum splash
 			else if (base === "config.ini") body = Buffer.from(patchConfig(body.toString("utf8")));
